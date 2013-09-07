@@ -42,6 +42,32 @@ struct class_luadef
         class_luarep<T>::DeallocateDeleter();
     }
 
+    
+
+    template<typename ParentClassT>
+    class_luadef& inherit()
+    {
+        int top = lua_gettop(L);
+        luaL_getmetatable(L,class_luarep<ParentClassT>::mt_name.c_str());
+        int parent_mtbl = lua_gettop(L);
+        luaL_getmetatable(L,class_luarep<T>::mt_name.c_str());
+        int mtbl = lua_gettop(L);
+        lua_pushnil(L);
+        while(lua_next(L,parent_mtbl) != 0)
+        {
+            int keyindex = lua_gettop(L) - 1;
+            if(lua_isstring(L,keyindex))
+            {
+                lua_setfield(L,mtbl,lua_tostring(L,keyindex));
+            }
+            else
+            {
+                lua_pop(L,1);
+            }
+        }
+        lua_settop(L,top);
+        return *this;
+    }
 
 
     /**
