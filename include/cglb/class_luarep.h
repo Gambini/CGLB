@@ -167,8 +167,8 @@ private:
             lua_getfield(L,-1,objname);                         //[3] = [2][objname]
             if(lua_isnoneornil(L,-1))
             {
-                deleter<FnPtr>* self = (deleter<FnPtr>*)lua_touserdata(L,lua_upvalueindex(1));
-                (*self->delete_func)(obj);
+                deleter<FnPtr>* self = (deleter<FnPtr>*)current_deleter;
+                (*(self->delete_func))(obj);
                 lua_pushboolean(L,1);                           //[4] = true
                 lua_setfield(L,-3,objname);                     //[2][objname] = [4]        -> pop[4]
             }
@@ -194,9 +194,7 @@ private:
         if(fn != NULL)
         {
             fn->delete_func = f;
-            lua_pushlightuserdata(L,current_deleter);
-            lua_pushcclosure(L,&deleter<Func>::gc_metamethod,1);//[2] = c function
-            //will setting this to be a new function destroy the previous upvalue?
+            lua_pushcfunction(L,deleter<Func>::gc_metamethod);
             lua_setfield(L,metaidx,"__gc");                     //pop[2]
         }
         lua_settop(L,metaidx-1); //stack cleanup

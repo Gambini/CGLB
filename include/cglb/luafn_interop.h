@@ -208,6 +208,7 @@ namespace detail {
     static typename std::enable_if< std::is_same<R,void>::value,int >::type
     /*static int*/ MemberFunctionCall(lua_State* L, T* self, FnPtrT fnptr, Args ... a)
     {
+        (void)L; //unused
         (self->*fnptr)(a ...);
         return 0;
     }
