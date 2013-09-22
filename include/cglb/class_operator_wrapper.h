@@ -34,6 +34,18 @@ struct class_operator_wrapper
     }
 
     template<typename leftType, typename rightType>
+    static auto mul(leftType left, rightType right) -> decltype(left * right)
+    {
+        return left * right;
+    }
+
+    template<typename leftType, typename rightType>
+    static auto divide(leftType left, rightType right) -> decltype(left / right)
+    {
+        return left / right;
+    }
+
+    template<typename leftType, typename rightType>
     static auto equal(leftType left, rightType right) -> decltype(left == right)
     {
         return left == right;

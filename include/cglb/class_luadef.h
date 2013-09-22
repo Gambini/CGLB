@@ -507,7 +507,7 @@ public:
     class_luadef& opAdd(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__add",fnptr);
+        return opMeta<pol>("__add",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -516,7 +516,7 @@ public:
     class_luadef& opSub(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__sub",fnptr);
+        return opMeta<pol>("__sub",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -524,7 +524,7 @@ public:
     class_luadef& opUnm(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__unm",fnptr);
+        return opMeta<pol>("__unm",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -532,7 +532,7 @@ public:
     class_luadef& opMul(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__mul",fnptr);
+        return opMeta<pol>("__mul",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -540,7 +540,7 @@ public:
     class_luadef& opDiv(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__div",fnptr);
+        return opMeta<pol>("__div",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -548,7 +548,7 @@ public:
     class_luadef& opMod(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__mod",fnptr);
+        return opMeta<pol>("__mod",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -556,7 +556,7 @@ public:
     class_luadef& opPow(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__pow",fnptr);
+        return opMeta<pol>("__pow",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -564,7 +564,7 @@ public:
     class_luadef& opConcat(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__concat",fnptr);
+        return opMeta<pol>("__concat",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -572,7 +572,7 @@ public:
     class_luadef& opEq(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__eq",fnptr);
+        return opMeta<pol>("__eq",fnptr);
     }
 
 
@@ -581,7 +581,7 @@ public:
     class_luadef& opLt(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__lt",fnptr);
+        return opMeta<pol>("__lt",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -589,7 +589,7 @@ public:
     class_luadef& opLe(FnPtr fnptr)
     {
         typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<FnPtr,Traits,pol>("__le",fnptr);
+        return opMeta<pol>("__le",fnptr);
     }
 
 
@@ -599,33 +599,18 @@ public:
     static std::mutex instantiate_mutex;
 
 
-private:
+public:
     /**
      * Helper function to all of the meta functions. Contains all of the
      * common boilerplate things for interacting with Lua metamethods
      */
-    template<typename FnPtr, typename Traits, typename pol>
+    template<typename pol, typename FnPtr, typename Traits = function_traits<FnPtr>>
     class_luadef& opMeta(const char* metaname, FnPtr fnptr)
     {
-        typedef function_def<Traits,FnPtr,pol> FnDefT;
         luaL_newmetatable(L,class_luarep<T>::mt_name.c_str());
         int mtidx = lua_gettop(L);
 
-        FnDefT* fndef = nullptr;
-        auto itr = registered_functions.find(metaname);
-        if(itr != registered_functions.end())
-        {
-            fndef = (FnDefT*)(itr->second);
-        }
-        else
-        {
-            fndef = (FnDefT*)malloc(sizeof(FnDefT));   
-            fndef->fnptr = fnptr;
-            registered_functions.insert(std::pair<std::string,void*>(metaname,(void*)fndef));
-        }
-
-        lua_pushlightuserdata(L,(void*)fndef);
-        lua_pushcclosure(L,&FnDefT::LuaFunction,1);
+        PushFunctionClosure<FnPtr,pol>(metaname, fnptr);
         lua_setfield(L,mtidx,metaname);
 
         lua_settop(L,mtidx-1);
@@ -638,7 +623,6 @@ private:
 
 
 
-//more member data
 private:
     /**
      * Usually a void* is a bad idea, but due to LuaJIT on x64 linux having a 2GB memory

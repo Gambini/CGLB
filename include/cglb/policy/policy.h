@@ -14,4 +14,7 @@ struct policy
     static const bool ShouldGC = ReturnGC::should_gc;
 };
 
+typedef policy<return_gc<std::true_type>> policy_return_gc;
+typedef policy<return_gc<std::false_type>> policy_return_nogc;
+
 }

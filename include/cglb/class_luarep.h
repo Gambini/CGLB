@@ -117,7 +117,6 @@ struct class_luarep
 
 
 
-
 private:
     friend struct class_luadef<T>;
 
@@ -274,7 +273,7 @@ private:
         lua_settop(L,methods - 1);                      //pop[>=methods]
     }
 
-
+public:
     //__tostring
     static int tostring(lua_State* L)
     {
@@ -312,10 +311,17 @@ private:
                 lua_rawget(L,-2);                           //[5] = __cglb_getters[key]
                 if(lua_type(L,-1) == LUA_TFUNCTION)
                 {
+                    int before_fcalltop = lua_gettop(L) - 1;//-1 to go below the function
                     lua_pushvalue(L,objidx);                //[6] = table/userdata
                     lua_pushvalue(L,keyidx);                //[7] = key
-                    if(lua_pcall(L,2,1,0) != 0)             //[6] = result of the function
+                    if(lua_pcall(L,2,LUA_MULTRET,0) != 0)   //[6+] = result of the function
+                    {
                         luaL_error(L,"%s.__index for %s",class_name.c_str(),lua_tostring(L,2));
+                    }
+                    else
+                    {
+                        return lua_gettop(L) - before_fcalltop;
+                    }
                 }
                 //it isn't a getter, check __index
                 else
@@ -329,10 +335,18 @@ private:
                         lua_rawget(L,-2);                   //[6] = mt.__index
                         if(lua_isfunction(L,-1))
                         {
+                            int before_fcalltop = lua_gettop(L) - 1; //-1 to go below the function
                             lua_pushvalue(L,-2);            //[7] = mt (rather than userdata)
                             lua_pushvalue(L,keyidx);        //[8] = key
                             if(lua_pcall(L,2,1,0) != 0)     //[7] = result of the function
+                            {
                                 luaL_error(L,"%s.__index for %s",class_name.c_str(),lua_tostring(L,2));
+                            }
+                            else
+                            {
+                                return lua_gettop(L) - before_fcalltop;
+                            }
+
                         }
                         else if(lua_istable(L,-1))
                         {
@@ -366,11 +380,6 @@ private:
             lua_pushnil(L);                                 //[4] = nil
         }
 
-        //some stack cleanup, though not really necessary
-        lua_replace(L,keyidx+1);                            //[keyidx+1] = result
-        lua_settop(L,keyidx+1);                             //pop[>(keyidx+1)]
-        //stack is now how it was given to us, but with one
-        //more item on it
         return 1;
     }
 
@@ -385,8 +394,8 @@ private:
         */
         //check  to see if the key is in our custom __setters metafunction
         int validx = lua_gettop(L);
-        int keyidx = validx-1;
-        int objidx = keyidx-1;
+        int keyidx = 2;
+        int objidx = 1;
         lua_getglobal(L,mt_name.c_str());                   //[4] = _G[mt_name]
         lua_pushstring(L,"__cglb_setters");                 //[5] = string
         lua_rawget(L,-2);                                   //[5] = mt_name[__cglb_setters]
@@ -398,12 +407,14 @@ private:
         {
             lua_pushvalue(L,objidx);                        //[7] = obj
             lua_pushvalue(L,keyidx);                        //[8] = key
-            lua_pushvalue(L,validx);                        //[9] = value
-            if(lua_pcall(L,3,1,0) != 0)                     //[7] = result
+                                                            //[9+] = value(s)
+            for(int i = keyidx + 1; i <= validx; ++i)
+            {
+                lua_pushvalue(L,i);
+            }
+            if(lua_pcall(L,validx - keyidx,0,0) != 0) 
                 luaL_error(L,"%s.__newindex for %s",class_name.c_str(),lua_tostring(L,keyidx));
         }
-
-        lua_settop(L,validx); //return the stack to the way we found it
         return 0;
     }
 

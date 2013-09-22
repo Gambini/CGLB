@@ -9,4 +9,4 @@
  * If your lua headers are different from this, then you should
  * edit this file to have them included.
  */
-#include <lua/lua.hpp>
+#include <lua.hpp>
