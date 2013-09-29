@@ -13,14 +13,28 @@ namespace detail {
             typename std::remove_reference<T>::type 
         >::type>
     //since lua handles all numbers the same way, we just need to check if it
-    //is an integral or floating point type. This also catches 'bool'
+    //is an integral or floating point type. 
     static typename std::enable_if<
-        std::is_arithmetic<strippedT>::value
-     || std::is_enum<strippedT>::value,
+        (std::is_arithmetic<strippedT>::value
+     || std::is_enum<strippedT>::value)
+     && !std::is_same<strippedT,bool>::value,
     strippedT >::type
     GetFuncArg(lua_State* L, int idx)
     {
         return static_cast<strippedT>(luaL_checknumber(L,idx));
+    }
+
+
+    template<typename T
+        , typename strippedT = typename std::decay<
+            typename std::remove_reference<T>::type
+        >::type>
+    static typename std::enable_if<
+        std::is_same<strippedT,bool>::value,
+    T >::type
+    GetFuncArg(lua_State* L, int idx)
+    {
+        return !!luaL_checkint(L,idx);
     }
 
 
@@ -128,7 +142,7 @@ namespace detail {
                                   && std::is_class<T>::value>::type
     PushFuncResult(lua_State* L, Tptr res)
     {
-        class_luarep<T>::push(L,res,pol::ShouldGC); //doesn't handle garbage-collection from constructors
+        class_luarep<T>::push(L,res,pol::ShouldGC); 
     }
 
 
@@ -139,7 +153,7 @@ namespace detail {
     >::type
     PushFuncResult(lua_State* L, Tref res)
     {
-        class_luarep<T>::push(L,res,pol::ShouldGC); //references can be pushed as pointers
+        class_luarep<T>::push(L,&res,pol::ShouldGC); 
     }
 
 
