@@ -88,5 +88,29 @@ struct class_operator_wrapper
         return ++self;
     }
 
+    template<typename opType, typename... Args>
+    static auto call(opType self, Args... a) -> decltype(self(a ...))
+    {
+        return self(a ...);
+    }
+
+    template<typename opType>
+    static auto unary_minus(opType self) -> decltype(-self)
+    {
+        return -self;
+    }
+
+    template<typename opType>
+    static auto unary_plus(opType self) -> decltype(+self)
+    {
+        return +self;
+    }
+
+    template<typename leftType, typename rightType>
+    static auto assignment(leftType left, rightType right) -> decltype(left = right)
+    {
+        return left = right;
+    }
+
 };
 }

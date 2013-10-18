@@ -4,6 +4,7 @@
  * See either the LICENSE file in the repo, or http://opensource.org/licenses/MIT 
  */
 #include "lua_include.h"
+#include "cglb_init.h"
 #include <vector>
 #include <assert.h>
 #include <algorithm>
@@ -124,12 +125,12 @@ private:
     /**
       * Called from class_luadef<T> constructor.
       */
-    static void setup(lua_State* L, const char* name)
+    static bool setup(lua_State* L, const char* name)
     {
         class_name = name;
         mt_name = name;
         mt_name.append("_mt");
-        Register(L);
+        return Register(L);
     }
 
     /**
@@ -220,14 +221,14 @@ private:
      * Checks to see if Register has been called for this lua_State before, and if not,
      * registers the basic metamethods.
      */
-    static void Register(lua_State* L)
+    static bool Register(lua_State* L)
     {
         lua_getglobal(L,mt_name.c_str());
         //See if it has been registered already
         if(!lua_isnoneornil(L,-1))
         {
             lua_pop(L,1);
-            return;
+            return record_types;
         }
         lua_pop(L,1);
         lua_newtable(L);                                //[1] = table
@@ -271,6 +272,7 @@ private:
         lua_setmetatable(L,methods);                    //setmetatable(["_G"][mt_name],[3])     -> pop[3]
        
         lua_settop(L,methods - 1);                      //pop[>=methods]
+        return false;
     }
 
 public:

@@ -9,6 +9,7 @@
 #include "memdat_def.h"
 #include "lua_include.h"
 #include "policy/return_gc.h"
+#include "cglb_init.h"
 #include <vector>
 #include <string>
 #include <type_traits>
@@ -27,7 +28,10 @@ struct class_luadef
         L(Ls),name(class_name)
     {
         std::lock_guard<std::mutex> lock(instantiate_mutex);
-        class_luarep<T>::setup(L,class_name);
+        if(class_luarep<T>::setup(L,class_name))
+        {
+            dealloc_functions.push_back(class_luadef<T>::DeallocateLuaDefs);
+        }
     }
 
 
@@ -40,6 +44,7 @@ struct class_luadef
             registered_functions[fnpair.first] = nullptr;
         }
         class_luarep<T>::DeallocateDeleter();
+        registered_functions.clear();
     }
 
     
@@ -590,6 +595,20 @@ public:
     {
         typedef policy<return_gc<std::true_type>> pol;
         return opMeta<pol>("__le",fnptr);
+    }
+
+    template<typename FnPtr, typename Traits = function_traits<FnPtr>>
+    //operator ()
+    class_luadef& opCall(FnPtr fnptr)
+    {
+        return opMeta<policy_return_gc>("__call",fnptr);
+    }
+
+    template<typename FnPtr, typename Traits = function_traits<FnPtr>>
+    //operator # 
+    class_luadef& opLen(FnPtr fnptr)
+    {
+        return opMeta<policy_return_gc>("__len",fnptr);
     }
 
 
