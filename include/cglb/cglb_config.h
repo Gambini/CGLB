@@ -12,5 +12,5 @@
  *
  * Defaults to undefined.
  */
-#define CGLB_GENERATE_BINDING_DOC
+//#define CGLB_GENERATE_BINDING_DOC
 #define CGLB_BINDING_DOC_FILENAME "cglb_binding_doc.txt"

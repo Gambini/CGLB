@@ -16,7 +16,7 @@ namespace detail {
     //is an integral or floating point type. 
     static typename std::enable_if<
         (std::is_arithmetic<strippedT>::value
-     || std::is_enum<strippedT>::value)
+     ||  std::is_enum<strippedT>::value)
      && !std::is_same<strippedT,bool>::value,
     strippedT >::type
     GetFuncArg(lua_State* L, int idx)
@@ -153,7 +153,7 @@ namespace detail {
     >::type
     PushFuncResult(lua_State* L, Tref res)
     {
-        class_luarep<T>::push(L,&res,pol::ShouldGC); 
+        class_luarep<T>::push(L,(T*)&res,pol::ShouldGC); 
     }
 
 
@@ -234,8 +234,9 @@ namespace detail {
     /*static int*/ MemberFunctionCall(lua_State* L, T* self, FnPtrT fnptr, Args ... a)
     {
         R ret = (self->*fnptr)(a ...);
+        int top = lua_gettop(L);
         PushFuncResult<R,pol>(L,ret);
-        return 1;
+        return lua_gettop(L) - top;
     }
 
 
@@ -257,8 +258,9 @@ namespace detail {
     /*static int*/ FunctionCall(lua_State* L, FnPtrT fnptr, Args ... a)
     {
         R ret = (*fnptr)(a ...);
+        int top = lua_gettop(L);
         PushFuncResult<R,pol>(L,ret);
-        return 1;
+        return lua_gettop(L) - top;
     }
 
 

@@ -4,6 +4,7 @@
  * See either the LICENSE file in the repo, or http://opensource.org/licenses/MIT 
  */
 #include "function_traits.h"
+#include "cglb_config.h"
 #include "function_def.h"
 #include "class_luarep.h"
 #include "memdat_def.h"
@@ -15,8 +16,62 @@
 #include <type_traits>
 #include <mutex>
 #include <unordered_map>
+#ifdef CGLB_GENERATE_BINDING_DOC
+#include <typeinfo>
+#include <fstream>
+#ifdef __GNUG__
+#include <memory>
+#include <cxxabi.h>
+#endif
+#endif
 
 namespace cglb {
+
+
+#ifdef CGLB_GENERATE_BINDING_DOC
+inline std::string demangle(const char* typeid_name)
+{
+#ifdef __GNUG__
+    int status = -1;
+    std::unique_ptr<char,void(*)(void*)> res {
+        abi::__cxa_demangle(typeid_name, NULL, NULL, &status),
+        std::free
+    };
+    return (status == 0) ? res.get() : typeid_name;
+#elif _MSC_VER
+    return typeid_name;
+#else
+    return typeid_name;
+#endif //GNUG or MSC_VER
+}
+
+template<typename T>
+std::string GetTypeName()
+{
+    return demangle(typeid(T).name());
+}
+
+template<typename FnPtrT>
+void GenDoc( std::string const& lua_type_name,
+             std::string const& doc_type, //function,member data, metamethod
+             std::string const& lua_fn_name)
+{
+    std::ofstream outfile(CGLB_BINDING_DOC_FILENAME, std::ios_base::out | std::ios_base::app);
+    outfile << "Type " << lua_type_name << " defines " << doc_type << " named " << 
+        lua_fn_name << " with signature " << GetTypeName<FnPtrT>() << "\n";
+}
+
+#else
+
+template<typename FnPtrT>
+void GenDoc(std::string const& lua_type_name, 
+            std::string const& doc_type, 
+            std::string const& lua_fn_name)
+{
+}
+#endif //CGLB_GENERATE_BINDING_DOC
+
+
 
 template <typename T>
 struct class_luadef
@@ -96,6 +151,7 @@ struct class_luadef
     class_luadef& >::type
     add(const char* fname, Func f)
     {
+        GenDoc<Func>(class_luarep<T>::class_name, "function", fname);
         typedef policy<return_gc<std::false_type>> pol;
 
         //setup for closure
@@ -265,6 +321,8 @@ public:
     class_luadef& >::type
     add(const char* dname, MemDatPtr memdat)
     {
+        GenDoc<MemDatPtr>(class_luarep<T>::class_name, "readwrite member data", dname);
+
         typedef memdat_traits<MemDatPtr> Traits;
         typedef memdat_def<MemDatPtr,Traits> MemDatT;
 
@@ -329,6 +387,8 @@ public:
     class_luadef& >::type
     add_readonly(const char* dname, MemDatPtr memdat)
     {
+        GenDoc<MemDatPtr>(class_luarep<T>::class_name, "readonly member data", dname);
+
         typedef memdat_traits<MemDatPtr> Traits;
         typedef memdat_def<MemDatPtr,Traits> MemDatT;
 
@@ -376,6 +436,8 @@ public:
     class_luadef& >::type
     add_writeonly(const char* dname, MemDatPtr memdat)
     {
+        GenDoc<MemDatPtr>(class_luarep<T>::class_name, "writeonly member data", dname);
+
         typedef memdat_traits<MemDatPtr> Traits;
         typedef memdat_def<MemDatPtr,Traits> MemDatT;
 
@@ -466,6 +528,8 @@ public:
         typedef policy<return_gc<std::true_type>> pol; //Constructor should always delete on GC
         typedef function_def<Traits,FuncT,pol> FnDefT;
         
+        GenDoc<FuncT>(class_luarep<T>::class_name, "constructor", "constructor");
+
         auto* fd = (FnDefT*)lua_newuserdata(L,sizeof(FnDefT));
         fd->fnptr = &class_luarep<T>::template constructor<Args...>::ConstructType;
 
@@ -491,6 +555,9 @@ public:
     class_luadef&>::type
     custom_constructor(Func f)
     {
+
+        GenDoc<Func>(class_luarep<T>::class_name, "constructor", "constructor");
+
         typedef policy<return_gc<std::true_type>> pol;
         luaL_newmetatable(L,class_luarep<T>::mt_name.c_str());
         int mtidx = lua_gettop(L);
@@ -511,8 +578,7 @@ public:
     //function defined as opAdd, then it will pick up "1" as the class type
     class_luadef& opAdd(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__add",fnptr);
+        return opMeta<policy_return_gc>("__add",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -520,64 +586,56 @@ public:
     //function defined as opSub, then it will pick up "1" as the class type
     class_luadef& opSub(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__sub",fnptr);
+        return opMeta<policy_return_gc>("__sub",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
     //unary minus
     class_luadef& opUnm(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__unm",fnptr);
+        return opMeta<policy_return_gc>("__unm",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
     //multiply
     class_luadef& opMul(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__mul",fnptr);
+        return opMeta<policy_return_gc>("__mul",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
     //divide
     class_luadef& opDiv(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__div",fnptr);
+        return opMeta<policy_return_gc>("__div",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
     //modulus
     class_luadef& opMod(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__mod",fnptr);
+        return opMeta<policy_return_gc>("__mod",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
     //power
     class_luadef& opPow(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__pow",fnptr);
+        return opMeta<policy_return_gc>("__pow",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
     //concat
     class_luadef& opConcat(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__concat",fnptr);
+        return opMeta<policy_return_gc>("__concat",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
     //equality
     class_luadef& opEq(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__eq",fnptr);
+        return opMeta<policy_return_gc>("__eq",fnptr);
     }
 
 
@@ -585,16 +643,14 @@ public:
     //less than
     class_luadef& opLt(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__lt",fnptr);
+        return opMeta<policy_return_gc>("__lt",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
     //less than or equal
     class_luadef& opLe(FnPtr fnptr)
     {
-        typedef policy<return_gc<std::true_type>> pol;
-        return opMeta<pol>("__le",fnptr);
+        return opMeta<policy_return_gc>("__le",fnptr);
     }
 
     template<typename FnPtr, typename Traits = function_traits<FnPtr>>
@@ -626,6 +682,7 @@ public:
     template<typename pol, typename FnPtr, typename Traits = function_traits<FnPtr>>
     class_luadef& opMeta(const char* metaname, FnPtr fnptr)
     {
+        GenDoc<FnPtr>(class_luarep<T>::class_name, "metamethod", metaname);
         luaL_newmetatable(L,class_luarep<T>::mt_name.c_str());
         int mtidx = lua_gettop(L);
 
