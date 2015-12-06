@@ -223,7 +223,7 @@ private:
      */
     static bool Register(lua_State* L)
     {
-        lua_getglobal(L,mt_name.c_str());
+        luaL_getmetatable(L,mt_name.c_str());
         //See if it has been registered already
         if(!lua_isnoneornil(L,-1))
         {
@@ -296,7 +296,7 @@ public:
         */
         int objidx = lua_gettop(L) - 1;
         int keyidx = lua_gettop(L);
-        lua_getglobal(L,mt_name.c_str());                   //[3] = _G[mt_name] table
+        luaL_getmetatable(L,mt_name.c_str());                   //[3] = _G[mt_name] table
         std::string strkey = lua_tostring(L,keyidx);
         if(lua_istable(L,-1))
         {
@@ -398,7 +398,7 @@ public:
         int validx = lua_gettop(L);
         int keyidx = 2;
         int objidx = 1;
-        lua_getglobal(L,mt_name.c_str());                   //[4] = _G[mt_name]
+        luaL_getmetatable(L,mt_name.c_str());               //[4] = _G[mt_name]
         lua_pushstring(L,"__cglb_setters");                 //[5] = string
         lua_rawget(L,-2);                                   //[5] = mt_name[__cglb_setters]
         

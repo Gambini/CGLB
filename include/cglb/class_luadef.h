@@ -68,6 +68,9 @@ void GenDoc(std::string const& lua_type_name,
             std::string const& doc_type, 
             std::string const& lua_fn_name)
 {
+    (void)lua_type_name;
+    (void)doc_type;
+    (void)lua_fn_name;
 }
 #endif //CGLB_GENERATE_BINDING_DOC
 
@@ -156,7 +159,7 @@ struct class_luadef
 
         //setup for closure
         auto mtn = class_luarep<T>::mt_name;
-        lua_getglobal(L,mtn.c_str());               //[1] = metatable
+        luaL_getmetatable(L,mtn.c_str());               //[1] = metatable
         if(lua_isnoneornil(L,-1))
         {
             luaL_error(L,"No metatable named %s. Global %s returned %s",mtn.c_str()
@@ -307,6 +310,28 @@ private:
             return mdef;
         }
     }
+
+
+    //used for getters and setters
+    //returns -1 on error
+    int PushMetaFunctionTable(const char* meta_name)
+    {
+        luaL_getmetatable(L,class_luarep<T>::mt_name.c_str());
+        if(lua_isnoneornil(L,-1))
+        {
+            luaL_error(L,"No metatable named %s",class_luarep<T>::mt_name.c_str());
+            return -1;
+        }
+        int mtidx = lua_gettop(L);
+        lua_pushstring(L,meta_name);
+        lua_rawget(L,mtidx);
+        if(lua_isnoneornil(L,-1))
+        {
+            luaL_error(L,"No %s for %s", meta_name, class_luarep<T>::class_name.c_str());
+            return -1;
+        }
+        return lua_gettop(L);
+    }
     
 public:
 
@@ -326,7 +351,7 @@ public:
         typedef memdat_traits<MemDatPtr> Traits;
         typedef memdat_def<MemDatPtr,Traits> MemDatT;
 
-        lua_getglobal(L,class_luarep<T>::mt_name.c_str());
+        luaL_getmetatable(L,class_luarep<T>::mt_name.c_str());
         if(lua_isnoneornil(L,-1))
         {
             luaL_error(L,"No metatable named %s",class_luarep<T>::mt_name.c_str());
@@ -376,6 +401,87 @@ public:
         
     }
 
+    /**
+     * Add a getter for <T> using a function. <Func> must be a member function pointer, or just a regular
+     * pointer that is _not_ to a member data. If it is a non-member function, the first
+     * parameter of <Func> MUST be of type lua_State*. There will be no available overloads
+     * of PushFunctionClosure if those conditions are not met.
+     *
+     * If the function is a non member function, then the possible function pointer types are
+     * int (*)(lua_State*) and int (*)(lua_State*,T*), where the T* is grabbed from index 1
+     * of the lua stack upon function call. See function_def.h, and the custom_function_def 
+     * in that file.
+     *
+     * In Lua, it will be accessed with the colon (.) operator
+     */
+    template< typename Func, typename Traits = function_traits<Func> >
+    typename std::enable_if<
+                (std::is_pointer<Func>::value
+             && !std::is_member_object_pointer<Func>::value) 
+              || std::is_member_function_pointer<Func>::value,
+    class_luadef& >::type
+    add_read(const char* getter_name, Func f)
+    {
+        GenDoc<Func>(class_luarep<T>::class_name, "read", getter_name);
+        typedef policy<return_gc<std::false_type>> pol;
+        
+        int top = lua_gettop(L);
+
+        int getter_idx = PushMetaFunctionTable("__cglb_getters");
+        if(getter_idx == -1)
+        {
+            lua_settop(L,top);
+            return *this;
+        }
+        
+        PushFunctionClosure<Func,pol>(getter_name,f);
+        lua_settable(L,getter_idx);
+
+        lua_settop(L,top);
+        return *this;
+    }
+
+
+    /**
+     * Add a setter for <T> using a function. <Func> must be a member function pointer, or just a regular
+     * pointer that is _not_ to a member data. If it is a non-member function, the first
+     * parameter of <Func> MUST be of type lua_State*. There will be no available overloads
+     * of PushFunctionClosure if those conditions are not met.
+     *
+     * If the function is a non member function, then the possible function pointer types are
+     * int (*)(lua_State*) and int (*)(lua_State*,T*), where the T* is grabbed from index 1
+     * of the lua stack upon function call. See function_def.h, and the custom_function_def 
+     * in that file.
+     *
+     * In Lua, it will be accessed with the colon (.) operator
+     */
+    template< typename Func, typename Traits = function_traits<Func> >
+    typename std::enable_if<
+                (std::is_pointer<Func>::value
+             && !std::is_member_object_pointer<Func>::value) 
+              || std::is_member_function_pointer<Func>::value,
+    class_luadef& >::type
+    add_write(const char* setter_name, Func f)
+    {
+        GenDoc<Func>(class_luarep<T>::class_name, "write", setter_name);
+        typedef policy<return_gc<std::false_type>> pol;
+        
+        int top = lua_gettop(L);
+
+        int setter_idx = PushMetaFunctionTable("__cglb_setters");
+        if(setter_idx == -1)
+        {
+            lua_settop(L,top);
+            return *this;
+        }
+        
+        PushFunctionClosure<Func,pol>(setter_name,f);
+        lua_settable(L,setter_idx);
+
+        lua_settop(L,top);
+        return *this;
+    }
+
     
     /**
      * Adds a get (__index) method, but not a set method.
@@ -392,7 +498,7 @@ public:
         typedef memdat_traits<MemDatPtr> Traits;
         typedef memdat_def<MemDatPtr,Traits> MemDatT;
 
-        lua_getglobal(L,class_luarep<T>::mt_name.c_str());
+        luaL_getmetatable(L,class_luarep<T>::mt_name.c_str());
         if(lua_isnoneornil(L,-1))
         {
             luaL_error(L,"No metatable named %s",class_luarep<T>::mt_name.c_str());
@@ -441,7 +547,7 @@ public:
         typedef memdat_traits<MemDatPtr> Traits;
         typedef memdat_def<MemDatPtr,Traits> MemDatT;
 
-        lua_getglobal(L,class_luarep<T>::mt_name.c_str());
+        luaL_getmetatable(L,class_luarep<T>::mt_name.c_str());
         if(lua_isnoneornil(L,-1))
         {
             luaL_error(L,"No metatable named %s",class_luarep<T>::mt_name.c_str());
@@ -518,7 +624,7 @@ public:
     class_luadef& constructor()
     {
         //need the metatable since we are setting a metafunction
-        luaL_newmetatable(L,class_luarep<T>::mt_name.c_str());
+        luaL_getmetatable(L,class_luarep<T>::mt_name.c_str());
         int mtidx = lua_gettop(L);
         
         typedef function_traits<
@@ -559,7 +665,7 @@ public:
         GenDoc<Func>(class_luarep<T>::class_name, "constructor", "constructor");
 
         typedef policy<return_gc<std::true_type>> pol;
-        luaL_newmetatable(L,class_luarep<T>::mt_name.c_str());
+        luaL_getmetatable(L,class_luarep<T>::mt_name.c_str());
         int mtidx = lua_gettop(L);
         PushFunctionClosure<Func,pol>("__init",f);
         lua_setfield(L,mtidx,"__init"); // as a metamethod
@@ -683,7 +789,7 @@ public:
     class_luadef& opMeta(const char* metaname, FnPtr fnptr)
     {
         GenDoc<FnPtr>(class_luarep<T>::class_name, "metamethod", metaname);
-        luaL_newmetatable(L,class_luarep<T>::mt_name.c_str());
+        luaL_getmetatable(L,class_luarep<T>::mt_name.c_str());
         int mtidx = lua_gettop(L);
 
         PushFunctionClosure<FnPtr,pol>(metaname, fnptr);
